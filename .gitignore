@@ -45,6 +45,6 @@ next-env.d.ts
 
 __pycache__
 *.csv
-*.json
+# *.json
 
 /Server/mosquitto
