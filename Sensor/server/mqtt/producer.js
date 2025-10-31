@@ -6,10 +6,10 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 const Producer = () => {
     let client
-    const BROKER = 'mqtt://localhost:1883';
+    const BROKER = process.env.MQTT_BROKER || 'mqtt://161.200.92.6:27004';
     const options = {
         connectTimeout: 5000,
-        clientId: 'nodejs_client_' + Math.random().toString(16).slice(3),
+        clientId: 'nodejs_producer_' + Math.random().toString(16).slice(3),
         clean: true,
         reconnectPeriod: 1000,
     };
@@ -19,18 +19,18 @@ const Producer = () => {
             client = mqtt.connect(BROKER, options);
 
             client.on('connect', () => {
-                console.log('Connected to MQTT broker');
+                console.log('[Producer] Connected to MQTT broker:', BROKER);
                 resolve();
             });
 
             client.on('error', (error) => {
-                console.error('MQTT connection error:', error);
+                console.error('[Producer] MQTT connection error:', error);
                 reject(error);
             });
 
             // Optional, just for logging/debugging
-            client.on('offline', () => console.log('MQTT client is offline'));
-            client.on('reconnect', () => console.log('Attempting to reconnect to MQTT broker'));
+            client.on('offline', () => console.log('[Producer] MQTT client is offline'));
+            client.on('reconnect', () => console.log('[Producer] Attempting to reconnect to MQTT broker'));
         });
     }
 
@@ -41,17 +41,17 @@ const Producer = () => {
             }
 
             const options = {
-                qos: 0,
+                qos: 1,  // Changed to QoS 1 for guaranteed delivery
                 retain: false,
                 dup: false
             }
 
             client.publish(topic, msg, options, (err) => {
                 if (err) {
-                    console.error(`Error publishing to topic ${topic}:`, err);
+                    console.error(`[Producer] Error publishing to topic ${topic}:`, err);
                     reject(err);
                 } else {
-                    console.log(`Successfully published to topic ${topic}`);
+                    console.log(`[Producer] Successfully published to topic ${topic}:`, msg);
                     resolve();
                 }
             });

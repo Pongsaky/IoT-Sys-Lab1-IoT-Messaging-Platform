@@ -1,7 +1,19 @@
 const { chula_route } = require('./static/chula_route.js');
 
 // ================ Import necessary libraries ================
+const Producer = require('./mqtt/producer.js');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+const V2X_TOPIC = process.env.V2X_TOPIC || 'september-failed-west-utah';
+let producer = null;
+
+// Initialize producer
+(async () => {
+	producer = Producer();
+	await producer.connect();
+	console.log('MQTT Producer connected and ready');
+})();
 // ============================================================
 
 let route_counter = 0;
@@ -17,7 +29,15 @@ process.on('message', async (message) => {
 		// you should send a payload containing the value to the "<topic>/speed" topic
 
 		// =================== Add your code below ========================
-
+		const topic = `${V2X_TOPIC}/speed`;
+		const payload = JSON.stringify({ speed: value });
+		
+		if (producer) {
+			await producer.publish(topic, payload);
+			console.log(`Published speed: ${value} to topic: ${topic}`);
+		} else {
+			console.error('Producer not initialized');
+		}
 		// ================================================================
 
 	} else if (type === 'heartbeat') {
@@ -26,7 +46,22 @@ process.on('message', async (message) => {
 		// you should send a payload containing the value to the "<topic>/heartbeat" topic
 
 		// =================== Add your code below ========================
+		const topic = `${V2X_TOPIC}/heartbeat`;
+		const heartbeatValue = value === 'ACTIVE';
+		activeStatus = heartbeatValue; // Track active status
+		const payload = JSON.stringify({ heartbeat: heartbeatValue });
+		
+		if (producer) {
+			await producer.publish(topic, payload);
+			console.log(`Published heartbeat: ${heartbeatValue} (${value}) to topic: ${topic}`);
+		} else {
+			console.error('Producer not initialized');
+		}
 
+		// If INACTIVE, clear route immediately
+		if (!heartbeatValue && location_runner) {
+			clear_route();
+		}
 		// ================================================================
 
 	} else if (type === 'route') {
@@ -52,8 +87,11 @@ process.on('SIGTERM', () => {
 
 function change_route(route_name, position_route) {
 	location_route = route_name;
-	location_runner = setInterval(() => {
+	location_runner = setInterval(async () => {
 		
+		// Don't send route data if vehicle is INACTIVE
+		if (!activeStatus) return;
+
 		// This section reads the lat, long, color from static/chula_route.js
 		// e.g. latitude = 13.738044, longitude = 100.529944, color = red
 		route_counter = (route_counter + 1) % chula_route.length;
@@ -65,7 +103,14 @@ function change_route(route_name, position_route) {
 
 		// =================== Add your code below ========================
 		// you should send a payload containing the latitude, longitude, and color to the "<topic>/route" topic
-
+		const topic = `${V2X_TOPIC}/route`;
+		
+		if (producer) {
+			await producer.publish(topic, msg);
+			console.log(`Published route: ${msg} to topic: ${topic}`);
+		} else {
+			console.error('Producer not initialized');
+		}
 		// ================================================================
 	}, 1000);
 }
